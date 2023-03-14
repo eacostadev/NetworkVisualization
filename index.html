@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Force Layout Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="network.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        svg {
+            width: 100vw;
+            height: 170vh;
+            margin: 3% 0 0 0;
+        }
+
+        line {
+            stroke-width: .4;
+        }
+
+        .inactive {
+            opacity: .16;
+        }
+
+        .notes {
+            margin: 0 0 0 5%;
+            font-size: 14px;
+        }
+
+        #paperTitle {
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="notes">
+        <p><span style="font-weight: bold;">Notes:</span><br>
+            The nodes are color coded by their Citations count <br>
+            When hovering over a node, the node grouping that gets enabled is by the first author's country<br>
+        </p>
+        <p style="margin-top: 10px;">Created by Elizabeth A.C.</p>
+    </div>
+    <div>
+        <p id="paperTitle"></p>
+    </div>
+    <svg></svg>
+    <script>
+        const width = 1500;
+        const height = 1000;
+        const colorScale = d3.scaleSequential()
+            .interpolator(d3.interpolateWarm)
+            .domain([0, 150])
+
+        d3.json("publication_network.json").then(function (data) {
+            let svg = d3.select("svg").attr("viewbox", `0 0 ${width} ${height}`);
+            console.log(data)
+            //   simulate(data, svg)
+
+            const areaScale = d3.scaleSqrt()
+                .domain([0, 277])
+                .range([4, 30]);
+
+
+            let gCanvas = svg.append("g").attr("class", "canvas");
+
+            let gLinks = gCanvas.selectAll()
+                .data(data.links)
+                .enter()
+                .append("line")
+                .attr("stroke", "black")
+
+            let gNodes = gCanvas.selectAll()
+                .data(data.nodes)
+                .enter()
+                .append("g")
+                .attr("id", d => d.id);
+
+            gNodes.append("circle")
+                .attr("r", d => areaScale(d.Citations))
+                .attr("fill", d => colorScale(d.Citations))
+                .attr("stroke", "#99a8b5")
+                .attr("class", d => "co_" + d.FirstAuthorCountry)
+
+            gNodes.on("mouseenter", (m, d) => {
+                // console.log(d)
+                d3.selectAll("#paperTitle").text(d.Title)
+                d3.selectAll("circle").classed("inactive", true)
+                d3.selectAll(".co_" + d.FirstAuthorCountry).classed("inactive", false)
+            });
+
+            gNodes.on("mouseleave", (d, data) => {
+                d3.selectAll("circle").classed("inactive", false)
+            });
+
+
+            let fSimulator = d3.forceSimulation(data.nodes)
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force("links", d3.forceLink(data.links)
+                    .id(function (n) { return n.id; })
+                    // .distance(5)
+                    //.strength(.1)
+                )
+                .force("collide", d3.forceCollide()
+                    .radius(d => areaScale(d.Citations) * 1.5)
+                    .iterations(5)
+                )
+                .force("charge", d3.forceManyBody().strength(-2))
+                .on("tick", update);
+
+            function update() {
+                gNodes.attr("transform", d => {
+                    // console.log(d)
+                    return `translate(${d.x}, ${d.y})`
+                })
+
+                gLinks.attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y)
+            }
+
+        });
+
+    </script>
+</body>
+
+</html>
